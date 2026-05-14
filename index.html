@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Nairobi County — Budget Transparency &amp; Accountability Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="auth.css">
+</head>
+<body>
+<!-- HEADER -->
+<header>
+  <div class="header-left">
+    <div class="header-badge">&#127963;</div>
+    <h1>Nairobi County &mdash; Budget Transparency &amp; Accountability
+      <span>Budget &middot; Revenue &middot; Oversight &middot; Historical Data &middot; Community Voice &middot; People's Budget</span>
+    </h1>
+  </div>
+  <div class="header-right">
+    <div class="fy-filter">
+      <label>Fiscal Year</label>
+      <select id="fySelect" onchange="Backend.onFYChange(this.value)">
+        <option value="all">All Years</option>
+        <option value="2019">FY 2018-2019</option>
+        <option value="2020">FY 2019-2020</option>
+        <option value="2021">FY 2020-2021</option>
+        <option value="2022">FY 2021-2022</option>
+        <option value="2023">FY 2022-2023</option>
+        <option value="2024">FY 2023-2024</option>
+        <option value="2025" selected>FY 2024-2025</option>
+      </select>
+    </div>
+    <div class="hpill" id="fyPill">FY 2024/25</div>
+    <button class="lang-btn" id="langBtn" onclick="toggleLang()">SW</button>
+  </div>
+</header>
+
+<!-- TAB NAV: scrollable, no scrollbar -->
+<nav class="tab-nav" id="tabNav">
+  <button class="tab-btn active"  data-tab="budget"         onclick="Backend.showTab('budget')"><span class="tab-icon">&#128202;</span> Budget Dashboard</button>
+  <button class="tab-btn"         data-tab="revenue"        onclick="Backend.showTab('revenue')"><span class="tab-icon">&#128176;</span> Revenue Streams</button>
+  <button class="tab-btn"         data-tab="historical"     onclick="Backend.showTab('historical')"><span class="tab-icon">&#128337;</span> Historical Data</button>
+  <button class="tab-btn"         data-tab="detector"       onclick="Backend.showTab('detector')"><span class="tab-icon">&#128269;</span> Corruption Detector</button>
+  <button class="tab-btn"         data-tab="map"            onclick="Backend.showTab('map')"><span class="tab-icon">&#128506;</span> Ward Map</button>
+  <button class="tab-btn"         data-tab="accountability" onclick="Backend.showTab('accountability')"><span class="tab-icon">&#9888;</span> Where It Leaks</button>
+  <button class="tab-btn"         data-tab="tracker"        onclick="Backend.showTab('tracker')"><span class="tab-icon">&#128203;</span> Case Tracker</button>
+  <button class="tab-btn"         data-tab="report"         onclick="Backend.showTab('report')"><span class="tab-icon">&#128221;</span> Report to EACC</button>
+  <button class="tab-btn"         data-tab="contacts"       onclick="Backend.showTab('contacts')"><span class="tab-icon">&#128222;</span> Key Contacts</button>
+  <button class="tab-btn"         data-tab="comments"       onclick="Backend.showTab('comments')"><span class="tab-icon">&#128172;</span> Community Comments</button>
+  <button class="tab-btn"         data-tab="peoples-budget" onclick="Backend.showTab('peoples-budget')"><span class="tab-icon">&#127775;</span> People's Budget</button>
+  <button class="tab-btn"         data-tab="reports"        onclick="Backend.showTab('reports')"><span class="tab-icon">&#128218;</span> Reports &amp; Downloads</button>
+</nav>
+<main>
+
+<!-- TAB 1: BUDGET DASHBOARD -->
+<div class="tab-panel active" id="tab-budget">
+  <div class="stats-grid">
+    <div class="stat-card"><span class="stat-icon">&#127974;</span><div class="stat-value" id="stat-total">--</div><div class="stat-label">Total Allocated</div></div>
+    <div class="stat-card gold"><span class="stat-icon">&#128184;</span><div class="stat-value" id="stat-spent">--</div><div class="stat-label">Est. Spent</div></div>
+    <div class="stat-card"><span class="stat-icon">&#128202;</span><div class="stat-value" id="stat-util">--</div><div class="stat-label">Utilisation Rate</div></div>
+    <div class="stat-card red"><span class="stat-icon">&#9888;</span><div class="stat-value" id="stat-over">--</div><div class="stat-label">High-Spend Depts</div></div>
+    <div class="stat-card blue"><span class="stat-icon">&#128197;</span><div class="stat-value" id="stat-rev">--</div><div class="stat-label">Total Revenue</div></div>
+  </div>
+  <div class="two-col">
+    <div class="card"><div class="section-heading">Budget vs Spending - Top 8 Depts</div><div class="chart-wrap"><canvas id="budgetChart"></canvas></div></div>
+    <div class="card"><div class="section-heading">Allocation Breakdown</div><div class="chart-wrap"><canvas id="pieChart"></canvas></div></div>
+  </div>
+  <div class="card">
+    <div class="section-heading">Department Spending Detail</div>
+    <div class="filter-row">
+      <label>Department:</label>
+      <select id="deptFilter" onchange="Backend.renderBudgetTable(this.value, document.getElementById('fySelect').value==='all'?'fy2025':'fy'+document.getElementById('fySelect').value.slice(-2))">
+        <option value="all">All Departments</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table id="budgetTable">
+        <thead><tr><th>Department</th><th>FY</th><th>Recurrent (KES)</th><th>Development (KES)</th><th>Total Allocated</th><th>Est. Spent</th><th>Utilisation</th><th>Status</th></tr></thead>
+        <tbody><tr><td colspan="8"><div class="loading"><div class="spinner"></div> Loading...</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 2: REVENUE -->
+<div class="tab-panel" id="tab-revenue">
+  <div class="stats-grid">
+    <div class="stat-card"><span class="stat-icon">&#128197;</span><div class="stat-value" id="rev-total">--</div><div class="stat-label">Total Revenue</div></div>
+    <div class="stat-card gold"><span class="stat-icon">&#127968;</span><div class="stat-value" id="rev-top">--</div><div class="stat-label">Top Source</div></div>
+    <div class="stat-card blue"><span class="stat-icon">&#128202;</span><div class="stat-value" id="rev-sources">--</div><div class="stat-label">Revenue Streams</div></div>
+  </div>
+  <div class="two-col">
+    <div class="card"><div class="section-heading">Revenue by Source</div><div id="revenueList"><div class="loading"><div class="spinner"></div></div></div></div>
+    <div class="card"><div class="section-heading">Revenue Breakdown</div><div class="chart-wrap"><canvas id="revenueChart"></canvas></div></div>
+  </div>
+  <div class="card"><div class="section-heading">Year-on-Year Revenue Trend (FY 2018/19 - FY 2024/25)</div><div class="chart-wrap" style="height:280px"><canvas id="revTrendChart"></canvas></div></div>
+</div>
+
+<!-- TAB 3: HISTORICAL DATA -->
+<div class="tab-panel" id="tab-historical">
+  <div class="hist-hero">
+    <h2>&#128337; Historical Budget Comparison</h2>
+    <p>Click any fiscal year card to drill into that year's data. All historical FY figures are modelled from official county growth trajectories for comparative analysis (FY 2018/19 to FY 2024/25).</p>
+  </div>
+  <div class="fy-compare-grid" id="fyCardsGrid"><div class="loading"><div class="spinner"></div></div></div>
+  <div id="histSummPills" class="fy-summary-bar"></div>
+  <div class="compare-chart-row">
+    <div class="card" style="margin-bottom:0"><div class="section-heading">Top-5 Dept Allocation Trend (All FYs)</div><div class="chart-wrap" style="height:320px"><canvas id="histTrendChart"></canvas></div></div>
+    <div class="card" style="margin-bottom:0"><div class="section-heading">Own Source Mix - Selected FY</div><div class="chart-wrap" style="height:320px"><canvas id="histPieChart"></canvas></div></div>
+  </div>
+  <div class="card" style="margin-top:24px">
+    <div class="section-heading">Dept Performance vs FY 2024/25 (Top 10)</div>
+    <div class="table-wrap">
+      <table id="histTable">
+        <thead><tr><th>Department</th><th>Allocation (Selected FY)</th><th>Est. Spent</th><th>Utilisation</th><th>FY 2024/25 Allocation</th><th>Change</th></tr></thead>
+        <tbody><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Select a fiscal year above</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 4: CORRUPTION DETECTOR -->
+<div class="tab-panel" id="tab-detector">
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+      <div class="section-heading" style="margin-bottom:0">AI Corruption Risk Detector</div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="risk-legend">
+          <div class="risk-dot"><span style="background:var(--red)"></span>High</div>
+          <div class="risk-dot"><span style="background:var(--orange)"></span>Medium</div>
+          <div class="risk-dot"><span style="background:var(--gold)"></span>Low</div>
+        </div>
+        <button class="btn-scan" id="btnScan" onclick="Backend.runScan()">&#128737; Run Scan</button>
+      </div>
+    </div>
+    <div class="risk-score-row" id="riskScoreRow" style="display:none">
+      <span style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap">Fiscal Risk Score</span>
+      <div class="risk-score-bar-bg"><div class="risk-score-bar-fill" id="riskBarFill" style="width:0%"></div></div>
+      <span class="risk-score-value" id="riskScoreVal">--</span>
+    </div>
+    <div class="detector-summary" id="detSummary" style="display:none">
+      <div class="det-sum-card"><div class="det-sum-val" id="dHigh" style="color:var(--red)">0</div><div class="det-sum-lbl">High Risk</div></div>
+      <div class="det-sum-card"><div class="det-sum-val" id="dMed"  style="color:var(--orange)">0</div><div class="det-sum-lbl">Medium Risk</div></div>
+      <div class="det-sum-card"><div class="det-sum-val" id="dLow"  style="color:var(--gold)">0</div><div class="det-sum-lbl">Low Risk</div></div>
+      <div class="det-sum-card"><div class="det-sum-val" id="dClean" style="color:var(--green-light)">0</div><div class="det-sum-lbl">Clean</div></div>
+    </div>
+    <div class="flags-grid" id="flagsGrid"></div>
+    <div class="detector-idle" id="detIdle">
+      <div class="idle-icon">&#128737;</div>
+      <p>Click <strong>Run Scan</strong> to analyse the FY 2025/2026 budget for spending anomalies and potential corruption risk indicators.</p>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 5: WARD MAP -->
+<div class="tab-panel" id="tab-map">
+  <div class="card" style="padding:20px">
+    <div class="section-heading">Ward Budget Allocation Map</div>
+    <div id="map"></div>
+    <p style="font-size:.7rem;color:var(--text-muted);margin-top:10px">Circle size = budget. Green=low risk, Orange=medium, Red=high. Click ward for details. Full dataset in Reports tab.</p>
+  </div>
+  <div class="card"><div class="section-heading">Ward Budget Rankings</div><div id="wardList"><div class="loading"><div class="spinner"></div></div></div></div>
+</div>
+
+<!-- TAB 6: WHERE IT LEAKS -->
+<div class="tab-panel" id="tab-accountability">
+  <div class="card">
+    <div class="section-heading">Where Tax Money Disappears</div>
+    <div class="leak-list">
+      <div class="leak-row"><div class="leak-num hot">&#129534;</div><div><div class="leak-title2">Cash collection without official receipts</div><div class="leak-desc2">County agents collect fees in cash without issuing receipts. Money disappears before reaching treasury.</div></div><div class="leak-bar-wrap"><div class="leak-bar-bg2"><div class="leak-bar-fill2" style="width:92%"></div></div><div class="leak-pct">Very common</div></div></div>
+      <div class="leak-row"><div class="leak-num hot">&#128101;</div><div><div class="leak-title2">Ghost workers and payroll padding</div><div class="leak-desc2">Salaries paid to non-existent employees. Thousands of ghost workers flagged across county payrolls.</div></div><div class="leak-bar-wrap"><div class="leak-bar-bg2"><div class="leak-bar-fill2" style="width:85%"></div></div><div class="leak-pct">Widespread</div></div></div>
+      <div class="leak-row"><div class="leak-num hot">&#128203;</div><div><div class="leak-title2">Inflated procurement and tender fraud</div><div class="leak-desc2">Contracts at 3-10x market price. Works undone or completed at fraction of contracted cost.</div></div><div class="leak-bar-wrap"><div class="leak-bar-bg2"><div class="leak-bar-fill2 warm" style="width:78%"></div></div><div class="leak-pct">High frequency</div></div></div>
+      <div class="leak-row"><div class="leak-num warm">&#127968;</div><div><div class="leak-title2">Under-assessment of property rates</div><div class="leak-desc2">Property owners bribe valuers. Billions in land rates lost annually.</div></div><div class="leak-bar-wrap"><div class="leak-bar-bg2"><div class="leak-bar-fill2 warm" style="width:70%"></div></div><div class="leak-pct">Medium-high</div></div></div>
+      <div class="leak-row"><div class="leak-num warm">&#128663;</div><div><div class="leak-title2">Parallel shadow collection by touts</div><div class="leak-desc2">Market and parking touts run shadow systems. Funds diverted before reaching county treasury.</div></div><div class="leak-bar-wrap"><div class="leak-bar-bg2"><div class="leak-bar-fill2 warm" style="width:62%"></div></div><div class="leak-pct">Widespread</div></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-heading">What You Can Do</div>
+    <div class="action-grid">
+      <div class="action-card2"><div class="act-step">Step 1 &middot; Safe</div><div class="act-title">Always demand an official receipt</div><div class="act-desc">Every county payment must come with a printed official receipt. If refused, photograph the agent and note badge number.</div><div class="tag-row"><span class="tag2 tg">Safe</span><span class="tag2 tg">Immediate</span></div></div>
+      <div class="action-card2"><div class="act-step">Step 2 &middot; Safe</div><div class="act-title">Use eCitizen or M-PESA paybills only</div><div class="act-desc">Digital payments create automatic records that cannot be pocketed.</div><div class="tag-row"><span class="tag2 tg">Safe</span><span class="tag2 tb">Digital trail</span></div></div>
+      <div class="action-card2"><div class="act-step">Step 3 &middot; Anonymous</div><div class="act-title">File a report with EACC</div><div class="act-desc">EACC accepts anonymous reports. Call 0800 720 750 toll-free. Use the Report tab to build a structured complaint.</div><div class="tag-row"><span class="tag2 tb">Anonymous ok</span><span class="tag2 tg">Protected</span></div></div>
+      <div class="action-card2"><div class="act-step">Step 4 &middot; Civic</div><div class="act-title">Engage your MCA</div><div class="act-desc">Your MCA has a legal duty to oversee county spending. Demand public budget hearings.</div><div class="tag-row"><span class="tag2 ta">Civic action</span></div></div>
+      <div class="action-card2"><div class="act-step">Step 5 &middot; Legal right</div><div class="act-title">Submit FOI requests</div><div class="act-desc">Under the Access to Information Act 2016, you can request any county revenue report, tender, or contract.</div><div class="tag-row"><span class="tag2 tb">Legal right</span></div></div>
+      <div class="action-card2"><div class="act-step">Step 6 &middot; High impact</div><div class="act-title">Organise with CBOs</div><div class="act-desc">Collective pressure from community organisations carries far more weight than individual reports.</div><div class="tag-row"><span class="tag2 ta">High impact</span><span class="tag2 tg">Collective</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 7: CASE TRACKER -->
+<div class="tab-panel" id="tab-tracker">
+  <div class="card">
+    <div class="section-heading">Public Corruption Case Tracker</div>
+    <div class="tracker-stats">
+      <div class="ts-card"><div class="ts-num" id="ct-open" style="color:var(--gold)">--</div><div class="ts-lbl">Open</div></div>
+      <div class="ts-card"><div class="ts-num" id="ct-inv" style="color:var(--blue)">--</div><div class="ts-lbl">Investigating</div></div>
+      <div class="ts-card"><div class="ts-num" id="ct-res" style="color:var(--green-light)">--</div><div class="ts-lbl">Resolved</div></div>
+      <div class="ts-card"><div class="ts-num" id="ct-tot">--</div><div class="ts-lbl">Total</div></div>
+    </div>
+    <div class="filter-btns">
+      <button class="fbtn active" onclick="setCaseFilter(this,'all')">All</button>
+      <button class="fbtn" onclick="setCaseFilter(this,'open')">Open</button>
+      <button class="fbtn" onclick="setCaseFilter(this,'investigating')">Investigating</button>
+      <button class="fbtn" onclick="setCaseFilter(this,'resolved')">Resolved</button>
+    </div>
+    <div class="cases-list2" id="casesList"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+<!-- TAB 8: REPORT TO EACC -->
+<div class="tab-panel" id="tab-report">
+  <div style="display:grid;grid-template-columns:1fr 360px;gap:24px;align-items:start">
+    <div class="form-box2">
+      <h3>Build Your EACC Complaint</h3>
+      <p class="fsub">Complete all steps. You may submit entirely anonymously.</p>
+      <div class="fsteps">
+        <div class="fstep active" onclick="Backend.setEACCStep(1)">1. Incident</div>
+        <div class="fstep" onclick="Backend.setEACCStep(2)">2. Evidence</div>
+        <div class="fstep" onclick="Backend.setEACCStep(3)">3. Contact</div>
+        <div class="fstep" onclick="Backend.setEACCStep(4)">4. Submit</div>
+      </div>
+      <div class="spanel active" id="step1">
+        <div class="fgrp"><label class="flabel">Type of Corruption</label>
+          <select class="fctrl"><option>Select type...</option><option>Ghost workers / payroll fraud</option><option>Cash diversion / no receipts</option><option>Tender / procurement fraud</option><option>Inflated contracts</option><option>Property rate under-assessment</option><option>Bribery / extortion</option><option>Asset theft or misuse</option><option>Other</option></select>
+        </div>
+        <div class="fgrp"><label class="flabel">Ward / Location</label><input class="fctrl" type="text" placeholder="e.g. Westlands Ward"></div>
+        <div class="fgrp"><label class="flabel">Date(s) of Incident</label><input class="fctrl" type="date"></div>
+        <div class="fgrp"><label class="flabel">Estimated Amount</label><input class="fctrl" type="text" placeholder="e.g. KES 50,000 or Unknown"></div>
+        <div class="fgrp"><label class="flabel">Description</label><textarea class="fctrl" placeholder="Describe what happened, who was involved..."></textarea></div>
+        <div class="step-foot"><span></span><button class="btn-next2" onclick="Backend.setEACCStep(2)">Next &rarr;</button></div>
+      </div>
+      <div class="spanel" id="step2">
+        <div class="fgrp"><label class="flabel">Evidence you have</label>
+          <div class="ckbox-grp">
+            <label class="cklabel"><input type="checkbox"> Photos</label>
+            <label class="cklabel"><input type="checkbox"> Receipts</label>
+            <label class="cklabel"><input type="checkbox"> Witnesses</label>
+            <label class="cklabel"><input type="checkbox"> Audio/Video</label>
+            <label class="cklabel"><input type="checkbox"> Bank records</label>
+            <label class="cklabel"><input type="checkbox"> Tender documents</label>
+          </div>
+        </div>
+        <div class="fgrp"><label class="flabel">Suspected Official (optional)</label><input class="fctrl" type="text" placeholder="Name, badge number, or role"></div>
+        <div class="step-foot"><button class="btn-back2" onclick="Backend.setEACCStep(1)">&larr; Back</button><button class="btn-next2" onclick="Backend.setEACCStep(3)">Next &rarr;</button></div>
+      </div>
+      <div class="spanel" id="step3">
+        <div class="anon-note2">Contact details are entirely optional - leave blank for full anonymity.</div>
+        <div class="fgrp"><label class="flabel">Your Name (optional)</label><input class="fctrl" type="text" placeholder="Leave blank to remain anonymous"></div>
+        <div class="fgrp"><label class="flabel">Phone or Email (optional)</label><input class="fctrl" type="text" placeholder="Leave blank for full anonymity"></div>
+        <div class="step-foot"><button class="btn-back2" onclick="Backend.setEACCStep(2)">&larr; Back</button><button class="btn-next2" onclick="Backend.setEACCStep(4)">Review &rarr;</button></div>
+      </div>
+      <div class="spanel" id="step4">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;font-size:.8rem;color:var(--text-muted);line-height:1.8">Submitting will generate a reference number for you to quote when contacting EACC directly. This form does not transmit data to any server.</div>
+        <button class="btn-submit2" onclick="Backend.submitEACC()">Submit Complaint &rarr;</button>
+        <div class="success-box2" id="successBox"></div>
+        <div class="step-foot" style="margin-top:8px"><button class="btn-back2" onclick="Backend.setEACCStep(3)">&larr; Back</button><span></span></div>
+      </div>
+    </div>
+    <div>
+      <div class="form-box2" style="margin-bottom:18px">
+        <h4 style="font-size:.82rem;font-weight:700;color:var(--green-light);margin-bottom:10px;letter-spacing:.05em;text-transform:uppercase">Legal Protections</h4>
+        <p style="font-size:.77rem;color:var(--text-muted);line-height:1.65">Kenya's <strong style="color:var(--text)">Witness Protection Act</strong> provides full anonymity. The <strong style="color:var(--text)">Bribery Act 2016</strong> means you cannot be prosecuted for reporting a bribe demanded from you.</p>
+      </div>
+      <div class="eacc-direct2">
+        <h4>Direct EACC Contacts</h4>
+        <a href="tel:0800720750">&#128222; 0800 720 750 (Toll-free, 24/7)</a>
+        <a href="mailto:eacc@integrity.go.ke">&#9993; eacc@integrity.go.ke</a>
+        <a href="https://eacc.go.ke" target="_blank" rel="noopener">&#127760; eacc.go.ke</a>
+        <a href="https://dci.go.ke" target="_blank" rel="noopener">&#127760; dci.go.ke - Economic crimes (DCI)</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 9: CONTACTS -->
+<div class="tab-panel" id="tab-contacts">
+  <div class="card">
+    <div class="section-heading">Key Contacts &amp; Accountability Bodies</div>
+    <div class="contacts-grid" id="contactsGrid"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+<!-- TAB 10: COMMUNITY COMMENTS -->
+<div class="tab-panel" id="tab-comments">
+  <div class="comments-hero">
+    <h2>&#128172; Community Voice - Speak Up About the Budget</h2>
+    <p>This is your space as a Nairobi resident to comment on the budget, raise concerns, ask questions, and suggest improvements. All comments are public. You may post anonymously.</p>
+  </div>
+  <div class="comment-stats-row">
+    <div class="cstat-card"><div class="cstat-val" id="cstat-total" style="color:var(--green-light)">0</div><div class="cstat-lbl">Total Comments</div></div>
+    <div class="cstat-card"><div class="cstat-val" id="cstat-likes"  style="color:var(--gold)">0</div><div class="cstat-lbl">Total Upvotes</div></div>
+    <div class="cstat-card"><div class="cstat-val" id="cstat-wards"  style="color:var(--blue)">0</div><div class="cstat-lbl">Wards Represented</div></div>
+    <div class="cstat-card"><div class="cstat-val" id="cstat-replies" style="color:var(--purple)">0</div><div class="cstat-lbl">Replies</div></div>
+  </div>
+  <div class="comment-compose">
+    <h3>&#9997; Share Your View</h3>
+    <div class="comment-form-row">
+      <input class="comment-input" type="text" id="cmtName" placeholder="Your name (leave blank for anonymous)">
+      <input class="comment-input" type="text" id="cmtWard" placeholder="Your ward (e.g. Kibra, Westlands)">
+    </div>
+    <textarea class="comment-input" id="cmtBody" placeholder="What do you think about the FY 2025/2026 budget? What would you improve? What concerns you?"></textarea>
+    <div class="comment-tags-row">
+      <span style="font-size:.72rem;color:var(--text-dim);align-self:center">Tag:</span>
+      <span class="ctag active" data-tag="general" onclick="toggleCtag(this)">&#127775; General</span>
+      <span class="ctag" data-tag="health"  onclick="toggleCtag(this)">&#127973; Health</span>
+      <span class="ctag" data-tag="infra"   onclick="toggleCtag(this)">&#128739; Infrastructure</span>
+      <span class="ctag" data-tag="edu"     onclick="toggleCtag(this)">&#127979; Education</span>
+      <span class="ctag" data-tag="water"   onclick="toggleCtag(this)">&#128167; Water</span>
+      <span class="ctag" data-tag="revenue" onclick="toggleCtag(this)">&#128184; Revenue</span>
+    </div>
+    <div class="comment-actions">
+      <label class="comment-anon"><input type="checkbox" id="cmtAnon"> Post anonymously</label>
+      <button class="btn-comment" onclick="Backend.submitComment()">Post Comment &rarr;</button>
+    </div>
+  </div>
+  <div class="filter-btns" style="margin-bottom:16px">
+    <span style="font-size:.72rem;color:var(--text-dim);align-self:center">Filter:</span>
+    <button class="fbtn active" onclick="setCommentFilter(this,'all')">All</button>
+    <button class="fbtn" onclick="setCommentFilter(this,'health')">&#127973; Health</button>
+    <button class="fbtn" onclick="setCommentFilter(this,'infra')">&#128739; Infrastructure</button>
+    <button class="fbtn" onclick="setCommentFilter(this,'edu')">&#127979; Education</button>
+    <button class="fbtn" onclick="setCommentFilter(this,'water')">&#128167; Water</button>
+    <button class="fbtn" onclick="setCommentFilter(this,'revenue')">&#128184; Revenue</button>
+    <button class="fbtn" onclick="setCommentFilter(this,'general')">&#127775; General</button>
+  </div>
+  <div class="comments-list" id="commentsList"><div class="loading"><div class="spinner"></div></div></div>
+  <button class="load-more-btn" id="loadMoreBtn" onclick="Backend.loadMoreComments()" style="display:none">&#8595; Load more comments</button>
+</div>
+
+<!-- TAB 11: PEOPLE'S BUDGET -->
+<div class="tab-panel" id="tab-peoples-budget">
+  <div class="pb-hero">
+    <h2>&#127775; Build the Budget Nairobi Deserves</h2>
+    <p>Use the sliders to reallocate the FY 2025/2026 budget of <strong style="color:var(--green-light)">KES 48.99 Billion</strong> across all 19 departments based on what matters most to you. Add your rationale for each change. Then generate and download your People's Budget proposal to share with your MCA or the County Assembly.</p>
+    <div class="pb-total-bar">
+      <div>
+        <div class="pb-total-label">Your Total Allocation</div>
+        <div class="pb-total-display" id="pbTotalDisplay">KES 0</div>
+      </div>
+      <span class="pb-remaining-pill pb-remaining-ok" id="pbRemainingPill">Loading...</span>
+    </div>
+  </div>
+  <div class="pb-sliders-grid" id="pbSlidersGrid"><div class="loading"><div class="spinner"></div></div></div>
+  <div class="pb-actions">
+    <button class="btn-pb-gen" onclick="Backend.generatePeoplesBudget()">&#127775; Generate My People's Budget</button>
+    <button class="btn-pb-reset" onclick="Backend.resetPB()">&#8635; Reset to Official Budget</button>
+  </div>
+  <div class="pb-result" id="pbResult">
+    <div class="pb-result-hero" id="pbResultHero"></div>
+    <div class="pb-result-grid" id="pbResultGrid"></div>
+    <div class="pb-download-row">
+      <button class="report-btn report-btn-csv" style="flex:none;padding:10px 20px" onclick="Backend.downloadPBCSV()">&#8595; Download as CSV</button>
+      <p style="font-size:.76rem;color:var(--text-muted);align-self:center;line-height:1.5;margin-left:12px">Share with your MCA, the County Assembly clerk, or post publicly to advocate for your priorities during public participation.</p>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 12: REPORTS & DOWNLOADS -->
+<div class="tab-panel" id="tab-reports">
+  <div class="reports-hero">
+    <h2>&#128218; Reports &amp; Downloads</h2>
+    <p>Download Nairobi County budget data in open, machine-readable formats derived from the official FY 2025/2026 Itemised Budget Estimates. Freely available for researchers, journalists, oversight bodies, and the public.</p>
+    <div class="reports-meta-strip">
+      <div><div class="rms-val" id="rstat-count">6</div><div class="rms-lbl">Reports Available</div></div>
+      <div><div class="rms-val" id="rstat-rows">--</div><div class="rms-lbl">Total Data Rows</div></div>
+      <div><div class="rms-val" id="rstat-size">~5.2MB</div><div class="rms-lbl">Total Dataset</div></div>
+      <div><div class="rms-val" id="rstat-updated">--</div><div class="rms-lbl">Last Updated</div></div>
+    </div>
+  </div>
+  <div class="reports-notice">
+    <div class="reports-notice-icon">&#8505;</div>
+    <div><strong>Data provenance:</strong> All figures sourced from the Nairobi City County Itemised Budget Estimates FY 2025/2026. Historical FY data is modelled from official growth trajectories. PDFs are for print; use CSV for data analysis.</div>
+  </div>
+  <div class="reports-grid" id="reportsGrid"><div class="loading"><div class="spinner"></div> Loading reports...</div></div>
+  <div class="api-card">
+    <h3>&#128279; Embedded Data Access</h3>
+    <p>All data is embedded directly in app.js - no server required. Works offline after first load. Open browser console and use the DB object to query any dataset.</p>
+    <div class="api-endpoints">
+      <div class="api-ep"><span class="api-method get">MODULE</span><span class="api-path">DB.getDepartments('fy2025')</span><span class="api-desc">19 depts with allocations and utilisation</span></div>
+      <div class="api-ep"><span class="api-method get">MODULE</span><span class="api-path">DB.getRevenue('fy2019')</span><span class="api-desc">Revenue by FY (fy2019-fy2025)</span></div>
+      <div class="api-ep"><span class="api-method get">MODULE</span><span class="api-path">DB.getHistoricalFY()</span><span class="api-desc">All 7 fiscal year metadata objects</span></div>
+      <div class="api-ep"><span class="api-method get">MODULE</span><span class="api-path">DB.getRiskFlags()</span><span class="api-desc">Corruption risk flags and scores</span></div>
+      <div class="api-ep"><span class="api-method get">MODULE</span><span class="api-path">DB.generateCSV('report-id')</span><span class="api-desc">Returns 2D array for any report</span></div>
+    </div>
+  </div>
+</div>
+
+</main>
+<footer>Nairobi County Government &middot; Budget Transparency &amp; Accountability Platform &middot; Data: FY 2025/2026 Itemised Budget Estimates &middot; For public use &middot; nairobi.go.ke</footer>
+<script src="app.js"></script>
+<script src="auth.js"></script>
+</body>
+</html>
